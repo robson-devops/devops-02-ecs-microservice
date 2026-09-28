@@ -11,12 +11,13 @@ variable "allocated_storage_gb" {
 
 variable "allowed_security_group_id" {
   description = <<-EOT
-    IDs dos security groups autorizados a conectar na porta do banco.
-    Fica vazio enquanto o serviço ECS não existe; depois recebe o SG das tasks.
-    O banco nunca é exposto por CIDR, apenas por security group de origem.
+    Security groups autorizados a conectar na porta do banco, indexados por um
+    nome estável (ex: "task"). É mapa e não lista de propósito: os IDs só são
+    conhecidos depois do apply, e o for_each exige que as CHAVES sejam
+    estáticas. O banco nunca é exposto por CIDR, apenas por origem.
   EOT
-  type        = list(string)
-  default     = []
+  type        = map(string)
+  default     = {}
 }
 
 variable "backup_retention_day" {

@@ -1,7 +1,23 @@
+variable "application_port" {
+  description = "Porta em que o container da aplicação escuta"
+  type        = number
+  default     = 8000
+}
+
 variable "aws_region" {
   description = "Região AWS onde a infraestrutura será provisionada"
   type        = string
   default     = "us-east-1"
+}
+
+variable "image_tag" {
+  description = <<-EOT
+    Tag da imagem usada na task definition inicial. O pipeline registra novas
+    revisões a cada deploy, então este valor só vale para o primeiro apply.
+    A imagem precisa existir no ECR antes do apply do serviço.
+  EOT
+  type        = string
+  default     = "bootstrap"
 }
 
 variable "environment" {

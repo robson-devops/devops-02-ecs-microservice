@@ -20,17 +20,17 @@ resource "aws_security_group" "main" {
 # Regra por security group de origem, não por CIDR: quem pode falar com o banco
 # é definido por identidade de recurso, não por faixa de IP.
 resource "aws_vpc_security_group_ingress_rule" "database" {
-  for_each = toset(var.allowed_security_group_id)
+  for_each = var.allowed_security_group_id
 
   security_group_id            = aws_security_group.main.id
-  description                  = "PostgreSQL a partir do security group autorizado"
+  description                  = "PostgreSQL a partir de ${each.key}"
   referenced_security_group_id = each.value
   from_port                    = var.port
   to_port                      = var.port
   ip_protocol                  = "tcp"
 
   tags = {
-    Name = "${var.name_prefix}-db-ingress"
+    Name = "${var.name_prefix}-db-ingress-${each.key}"
   }
 }
 

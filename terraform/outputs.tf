@@ -3,6 +3,26 @@ output "ecr_repository_url" {
   value       = module.ecr.repository_url
 }
 
+output "ecs_cluster_name" {
+  description = "Nome do cluster ECS, usado pelo pipeline"
+  value       = module.ecs_service.cluster_name
+}
+
+output "ecs_service_name" {
+  description = "Nome do serviço ECS, usado pelo pipeline"
+  value       = module.ecs_service.service_name
+}
+
+output "ecs_task_definition_family" {
+  description = "Família da task definition, usada pelo pipeline"
+  value       = module.ecs_service.task_definition_family
+}
+
+output "application_url" {
+  description = "URL pública da aplicação, via ALB"
+  value       = "http://${module.alb.dns_name}"
+}
+
 output "database_endpoint" {
   description = "Endereço de conexão do RDS"
   value       = module.rds.endpoint

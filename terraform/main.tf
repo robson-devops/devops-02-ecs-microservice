@@ -13,6 +13,15 @@ module "ecr" {
   name = local.name_prefix
 }
 
+module "alb" {
+  source = "./modules/alb"
+
+  name_prefix      = local.name_prefix
+  vpc_id           = module.network.vpc_id
+  subnet_id        = module.network.public_subnet_id
+  application_port = var.application_port
+}
+
 module "rds" {
   source = "./modules/rds"
 
@@ -20,7 +29,28 @@ module "rds" {
   vpc_id      = module.network.vpc_id
   subnet_id   = module.network.private_subnet_id
 
-  # Preenchido na etapa do ECS com o security group das tasks. Enquanto vazio,
-  # o banco sobe sem nenhuma origem autorizada — que é o padrão seguro.
-  allowed_security_group_id = []
+  # Única origem autorizada a falar com o banco: as tasks da aplicação.
+  allowed_security_group_id = {
+    task = module.ecs_service.security_group_id
+  }
+}
+
+module "ecs_service" {
+  source = "./modules/ecs_service"
+
+  name_prefix      = local.name_prefix
+  vpc_id           = module.network.vpc_id
+  subnet_id        = module.network.public_subnet_id
+  application_port = var.application_port
+
+  alb_security_group_id = module.alb.security_group_id
+  target_group_arn      = module.alb.target_group_arn
+
+  image = "${module.ecr.repository_url}:${var.image_tag}"
+
+  database_endpoint   = module.rds.endpoint
+  database_port       = module.rds.port
+  database_name       = module.rds.database_name
+  database_username   = module.rds.master_username
+  database_secret_arn = module.rds.master_user_secret_arn
 }
