@@ -1,0 +1,109 @@
+variable "allocated_storage_gb" {
+  description = "Armazenamento inicial da instância, em GB. O mínimo do gp3 no RDS é 20"
+  type        = number
+  default     = 20
+
+  validation {
+    condition     = var.allocated_storage_gb >= 20
+    error_message = "O armazenamento deve ser de ao menos 20 GB (mínimo do gp3 no RDS)."
+  }
+}
+
+variable "allowed_security_group_id" {
+  description = <<-EOT
+    IDs dos security groups autorizados a conectar na porta do banco.
+    Fica vazio enquanto o serviço ECS não existe; depois recebe o SG das tasks.
+    O banco nunca é exposto por CIDR, apenas por security group de origem.
+  EOT
+  type        = list(string)
+  default     = []
+}
+
+variable "backup_retention_day" {
+  description = "Dias de retenção dos backups automáticos. Zero desliga o backup"
+  type        = number
+  default     = 7
+
+  validation {
+    condition     = var.backup_retention_day >= 1
+    error_message = "A retenção de backup deve ser de ao menos 1 dia."
+  }
+}
+
+variable "database_name" {
+  description = "Nome do banco de dados criado na instância"
+  type        = string
+  default     = "tasksdb"
+}
+
+variable "deletion_protection" {
+  description = <<-EOT
+    Impede que a instância seja destruída por engano. Falso por padrão para
+    que terraform destroy funcione no laboratório; em produção deve ser true.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "engine_version" {
+  description = "Versão maior do PostgreSQL. As versões menores sobem sozinhas via auto_minor_version_upgrade"
+  type        = string
+  default     = "16"
+}
+
+variable "instance_class" {
+  description = "Classe da instância RDS"
+  type        = string
+  default     = "db.t4g.micro"
+}
+
+variable "master_username" {
+  description = "Usuário administrador do banco. A senha é gerada e rotacionada pela AWS, nunca definida aqui"
+  type        = string
+  default     = "appadmin"
+}
+
+variable "multi_az" {
+  description = <<-EOT
+    Habilita réplica em outra AZ com failover automático. Dobra o custo da
+    instância, então fica desligado por padrão em ambiente de estudo.
+  EOT
+  type        = bool
+  default     = false
+}
+
+variable "name_prefix" {
+  description = "Prefixo aplicado ao nome de todos os recursos criados pelo módulo"
+  type        = string
+}
+
+variable "port" {
+  description = "Porta em que o PostgreSQL escuta"
+  type        = number
+  default     = 5432
+}
+
+variable "skip_final_snapshot" {
+  description = <<-EOT
+    Descarta o snapshot final ao destruir a instância. Verdadeiro em ambiente
+    de estudo, para que terraform destroy não deixe snapshot cobrando.
+    Em produção isto deve ser falso.
+  EOT
+  type        = bool
+  default     = true
+}
+
+variable "subnet_id" {
+  description = "IDs das subnets privadas onde a instância será criada. Exige ao menos duas AZs"
+  type        = list(string)
+
+  validation {
+    condition     = length(var.subnet_id) >= 2
+    error_message = "O subnet group do RDS exige subnets em ao menos duas AZs."
+  }
+}
+
+variable "vpc_id" {
+  description = "ID da VPC onde o security group do banco será criado"
+  type        = string
+}

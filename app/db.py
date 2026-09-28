@@ -18,7 +18,11 @@ def database_url() -> str:
     name = os.environ["DB_NAME"]
     user = os.environ["DB_USER"]
     password = os.environ["DB_PASSWORD"]
-    return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{name}"
+    # O RDS está configurado com rds.force_ssl = 1 e recusa conexão em texto
+    # claro. Em desenvolvimento local, contra um Postgres sem TLS, use
+    # DB_SSLMODE=disable. Ver Limitações no README sobre verify-full.
+    sslmode = os.getenv("DB_SSLMODE", "require")
+    return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{name}?sslmode={sslmode}"
 
 
 # pool_pre_ping evita a task servir erro depois que o RDS reinicia ou faz
