@@ -98,21 +98,6 @@ jobs:
 
           docker rm -f app-test
 
-      # TEMPORARIO: imprime apenas as claims do token para comparar com a
-      # trust policy. Nenhum segredo é exposto — sub, aud e iss são públicos.
-      - name: Diagnostico do token OIDC
-        if: github.event_name != 'pull_request'
-        run: |
-          TOKEN=$(curl -sS \
-            -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=sts.amazonaws.com" \
-            | python3 -c 'import sys,json;print(json.load(sys.stdin)["value"])')
-
-          PAYLOAD=$(echo "$TOKEN" | cut -d. -f2)
-          PAYLOAD="$PAYLOAD$(printf '=%.0s' $(seq $(( (4 - ${#PAYLOAD} % 4) % 4 ))))"
-          echo "$PAYLOAD" | tr '_-' '/+' | base64 -d 2>/dev/null \
-            | python3 -c 'import sys,json;c=json.load(sys.stdin);print("sub =",c["sub"]);print("aud =",c["aud"]);print("iss =",c["iss"])'
-
       - name: Assumir role na AWS via OIDC
         if: github.event_name != 'pull_request'
         uses: aws-actions/configure-aws-credentials@v4
