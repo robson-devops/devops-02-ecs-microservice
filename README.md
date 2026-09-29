@@ -192,7 +192,7 @@ duas tasks. Procedimento completo em [`docs/validacao-aws.md`](docs/validacao-aw
 
 ### Ferramentas
 
-Terraform `>= 1.14`, AWS CLI v2, Docker e GitHub CLI (`gh`) autenticado.
+Terraform `>= 1.14`, AWS CLI v2, Docker e GitHub CLI (`gh`).
 
 > No macOS, o formula `terraform` do Homebrew core está parado na 1.5.7. Use o
 > tap oficial: `brew install hashicorp/tap/terraform`.
@@ -205,8 +205,46 @@ Terraform `>= 1.14`, AWS CLI v2, Docker e GitHub CLI (`gh`) autenticado.
 | **Pipeline** | O GitHub Actions | Role criada pelo próprio Terraform (`pipeline_identity`) — nenhuma chave a gerar |
 | **Tasks** | Os containers | Roles criadas pelo Terraform (`ecs_service`) |
 
+### Login na AWS e no GitHub
+
+O Terraform e a AWS CLI usam a mesma credencial, lida do perfil configurado na
+sua máquina. Sem ela, o primeiro `terraform apply` falha com
+`No valid credential sources found`.
+
+Escolha uma das formas, conforme a sua conta:
+
+**Usuário IAM com access key:**
+
+```bash
+aws configure
+```
+
+Informe a access key, a secret key, a região `us-east-1` e o formato `json`.
+
+**AWS IAM Identity Center (SSO):**
+
+```bash
+aws configure sso
+aws sso login --profile <seu-perfil>
+export AWS_PROFILE=<seu-perfil>
+```
+
+A sessão SSO expira. Se o Terraform acusar token expirado no meio do trabalho,
+repita o `aws sso login`.
+
+Confira qual identidade está ativa antes de qualquer comando. A conta que
+aparecer aqui é onde tudo será criado:
+
 ```bash
 aws sts get-caller-identity
+```
+
+O `gh` precisa estar autenticado no dono do repositório, para gravar o secret
+do pipeline:
+
+```bash
+gh auth login
+gh auth status
 ```
 
 ### Provider OIDC do GitHub
