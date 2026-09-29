@@ -1,3 +1,20 @@
+# O Container Insights grava as métricas num log group que a própria AWS cria
+# se ele não existir — sem retenção e fora do Terraform, então ele sobrevive
+# ao destroy. Criando antes, com o nome exato que o ECS usa, o ECS adota este
+# log group e o destroy o remove.
+resource "aws_cloudwatch_log_group" "container_insight" {
+  # checkov:skip=CKV_AWS_158: cifrado com a chave gerenciada pela AWS; chave
+  # KMS própria custa ~US$1/mês e não se justifica nesta escala.
+  # checkov:skip=CKV_AWS_338: retenção curta em vez de 1 ano, por ser
+  # ambiente efêmero.
+  name              = "/aws/ecs/containerinsights/${var.name_prefix}/performance"
+  retention_in_days = var.log_retention_day
+
+  tags = {
+    Name = "${var.name_prefix}-container-insight"
+  }
+}
+
 resource "aws_ecs_cluster" "main" {
   name = var.name_prefix
 
@@ -9,12 +26,16 @@ resource "aws_ecs_cluster" "main" {
   tags = {
     Name = var.name_prefix
   }
+
+  # No apply, o log group existe antes da primeira métrica; no destroy, o
+  # cluster sai antes dele.
+  depends_on = [aws_cloudwatch_log_group.container_insight]
 }
 
 resource "aws_cloudwatch_log_group" "main" {
   # checkov:skip=CKV_AWS_158: cifrado com a chave gerenciada pela AWS; chave
   # KMS própria custa ~US$1/mês e não se justifica nesta escala.
-  # checkov:skip=CKV_AWS_338: retenção de 14 dias em vez de 1 ano, por ser
+  # checkov:skip=CKV_AWS_338: retenção curta em vez de 1 ano, por ser
   # ambiente efêmero.
   name              = "/${var.name_prefix}/app"
   retention_in_days = var.log_retention_day

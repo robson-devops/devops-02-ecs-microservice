@@ -28,12 +28,13 @@ variable "image_tag" {
 
 variable "create_oidc_provider" {
   description = <<-EOT
-    Cria o provider OIDC do GitHub. Ele é único por conta AWS: deixe falso se
-    já existir de outro projeto. Confira com
+    Cria o provider OIDC do GitHub, que é apagado junto no destroy. Ele é
+    único por conta AWS: se já existir de outro projeto, use false para
+    apenas referenciá-lo. Confira com
     aws iam list-open-id-connect-providers antes do primeiro apply.
   EOT
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "environment" {

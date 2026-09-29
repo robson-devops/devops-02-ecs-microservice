@@ -58,6 +58,28 @@ variable "instance_class" {
   default     = "db.t4g.micro"
 }
 
+variable "log_export" {
+  description = "Logs do PostgreSQL exportados para o CloudWatch. Cada um ganha um log group gerenciado pelo módulo"
+  type        = list(string)
+  default     = ["postgresql", "upgrade"]
+
+  validation {
+    condition     = alltrue([for log in var.log_export : contains(["postgresql", "upgrade", "iam-db-auth-error"], log)])
+    error_message = "Valores aceitos pelo RDS PostgreSQL: postgresql, upgrade, iam-db-auth-error."
+  }
+}
+
+variable "log_retention_day" {
+  description = "Dias de retenção dos logs do banco no CloudWatch"
+  type        = number
+  default     = 14
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365], var.log_retention_day)
+    error_message = "Use um dos valores de retenção aceitos pelo CloudWatch Logs (1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180 ou 365)."
+  }
+}
+
 variable "master_username" {
   description = "Usuário administrador do banco. A senha é gerada e rotacionada pela AWS, nunca definida aqui"
   type        = string

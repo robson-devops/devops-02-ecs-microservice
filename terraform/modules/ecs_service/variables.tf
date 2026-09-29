@@ -58,9 +58,14 @@ variable "image" {
 }
 
 variable "log_retention_day" {
-  description = "Dias de retenção dos logs das tasks no CloudWatch"
+  description = "Dias de retenção no CloudWatch dos logs das tasks e das métricas do Container Insights"
   type        = number
   default     = 14
+
+  validation {
+    condition     = contains([1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365], var.log_retention_day)
+    error_message = "Use um dos valores de retenção aceitos pelo CloudWatch Logs (1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180 ou 365)."
+  }
 }
 
 variable "memory" {

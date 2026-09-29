@@ -80,6 +80,25 @@ resource "aws_db_parameter_group" "main" {
   }
 }
 
+# Se o log group não existir quando o RDS começa a exportar, a própria AWS o
+# cria — sem retenção (logs para sempre) e fora do Terraform, então ele
+# sobrevive ao destroy. Criando antes, com o nome exato que o RDS usa, o RDS
+# adota este log group e o destroy o remove.
+resource "aws_cloudwatch_log_group" "database" {
+  # checkov:skip=CKV_AWS_158: cifrado com a chave gerenciada pela AWS; chave
+  # KMS própria custa ~US$1/mês e não se justifica nesta escala.
+  # checkov:skip=CKV_AWS_338: retenção curta em vez de 1 ano, por ser
+  # ambiente efêmero.
+  for_each = toset(var.log_export)
+
+  name              = "/aws/rds/instance/${local.identifier}/${each.key}"
+  retention_in_days = var.log_retention_day
+
+  tags = {
+    Name = "${local.identifier}-${each.key}"
+  }
+}
+
 resource "aws_db_instance" "main" {
   # checkov:skip=CKV_AWS_157: multi_az é variável e fica desligado por padrão.
   # Réplica em outra AZ dobra o custo da instância e este é um ambiente de
@@ -97,7 +116,7 @@ resource "aws_db_instance" "main" {
   # checkov:skip=CKV2_AWS_30: o log de consultas está ligado via parameter
   # group, mas com log_statement = ddl em vez de all. Registrar toda consulta
   # gravaria também os dados trafegados nelas.
-  identifier     = "${var.name_prefix}-db"
+  identifier     = local.identifier
   engine         = "postgres"
   engine_version = var.engine_version
   instance_class = var.instance_class
@@ -129,13 +148,17 @@ resource "aws_db_instance" "main" {
   auto_minor_version_upgrade = true
 
   iam_database_authentication_enabled = true
-  enabled_cloudwatch_logs_exports     = ["postgresql", "upgrade"]
+  enabled_cloudwatch_logs_exports     = var.log_export
 
   # 7 dias de retenção do Performance Insights é a faixa sem custo adicional.
   performance_insights_enabled          = true
   performance_insights_retention_period = 7
 
   tags = {
-    Name = "${var.name_prefix}-db"
+    Name = local.identifier
   }
+
+  # Garante a ordem nos dois sentidos: no apply, os log groups existem antes
+  # da primeira exportação; no destroy, a instância sai antes deles.
+  depends_on = [aws_cloudwatch_log_group.database]
 }
