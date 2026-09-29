@@ -1,3 +1,14 @@
+variable "force_delete" {
+  description = <<-EOT
+    Permite destruir o repositório mesmo com imagens dentro. Verdadeiro em
+    ambiente efêmero, onde o terraform destroy falharia porque o pipeline
+    publicou imagens que o Terraform não conhece. Em produção deve ser falso,
+    para que apagar o repositório por engano não leve as imagens junto.
+  EOT
+  type        = bool
+  default     = true
+}
+
 variable "name" {
   description = "Nome do repositório ECR"
   type        = string

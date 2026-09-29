@@ -1,3 +1,18 @@
+output "cluster_arn" {
+  description = "ARN do cluster ECS, usado como condição na policy do pipeline"
+  value       = aws_ecs_cluster.main.arn
+}
+
+output "role_arn" {
+  description = "ARNs das roles de execução e da task, sobre as quais o pipeline precisa de iam:PassRole"
+  value       = [aws_iam_role.execution.arn, aws_iam_role.task.arn]
+}
+
+output "service_arn" {
+  description = "ARN do serviço ECS, usado para restringir o UpdateService da policy do pipeline"
+  value       = aws_ecs_service.main.id
+}
+
 output "cluster_name" {
   description = "Nome do cluster ECS, usado pelo pipeline no update-service"
   value       = aws_ecs_cluster.main.name

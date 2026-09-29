@@ -2,7 +2,8 @@ resource "aws_ecr_repository" "main" {
   # checkov:skip=CKV_AWS_136: cifrado com AES256 (chave gerenciada pela AWS).
   # Chave KMS própria custa ~US$1/mês e só se justifica quando há exigência de
   # controle da chave pelo cliente, o que não é o caso deste projeto.
-  name = var.name
+  name         = var.name
+  force_delete = var.force_delete
 
   # IMMUTABLE: uma tag publicada nunca mais muda de conteúdo. É o que garante
   # que a imagem auditada é a mesma que está rodando. Consequência prática: o

@@ -35,6 +35,19 @@ module "rds" {
   }
 }
 
+module "pipeline_identity" {
+  source = "./modules/pipeline_identity"
+
+  name_prefix          = local.name_prefix
+  github_repository    = var.github_repository
+  create_oidc_provider = var.create_oidc_provider
+
+  ecr_repository_arn = module.ecr.repository_arn
+  ecs_cluster_arn    = module.ecs_service.cluster_arn
+  ecs_service_arn    = module.ecs_service.service_arn
+  ecs_task_role_arn  = module.ecs_service.role_arn
+}
+
 module "ecs_service" {
   source = "./modules/ecs_service"
 

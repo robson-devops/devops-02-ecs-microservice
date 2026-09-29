@@ -1,0 +1,175 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - ".github/workflows/ci-cd.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+  workflow_dispatch:
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: devops-02-dev
+  ECS_CLUSTER: devops-02-dev
+  ECS_SERVICE: devops-02-dev
+  ECS_TASK_FAMILY: devops-02-dev
+  CONTAINER_NAME: app
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      image: ${{ steps.push.outputs.image }}
+
+    # Postgres de verdade para o teste de integração. Testar a app com banco
+    # falso não provaria nada sobre o caminho que ela usa em produção.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          POSTGRES_PASSWORD: cionly
+          POSTGRES_DB: tasksdb
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U appuser"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build da imagem
+        working-directory: app
+        # --provenance e --sbom desligados de propósito: com eles o BuildKit
+        # publica um índice com manifestos filhos SEM tag, e a regra de
+        # lifecycle do ECR que expira imagens sem tag poderia apagar um
+        # manifesto ainda referenciado. Build de plataforma única não precisa
+        # de índice.
+        run: |
+          docker build \
+            --platform linux/amd64 \
+            --provenance=false \
+            --sbom=false \
+            -t "app:${{ github.sha }}" .
+
+      - name: Teste de integracao contra PostgreSQL
+        run: |
+          docker run -d --name app-test --network host \
+            -e DB_HOST=127.0.0.1 \
+            -e DB_PORT=5432 \
+            -e DB_NAME=tasksdb \
+            -e DB_USER=appuser \
+            -e DB_PASSWORD=cionly \
+            -e DB_SSLMODE=disable \
+            app:${{ github.sha }}
+
+          for _ in $(seq 1 20); do
+            if curl -sf http://127.0.0.1:8000/ready >/dev/null; then break; fi
+            sleep 2
+          done
+
+          echo "--- readiness (confirma conexao com o banco) ---"
+          curl -sf http://127.0.0.1:8000/ready || { docker logs app-test; exit 1; }
+
+          echo "--- cria e le uma tarefa ---"
+          ID=$(curl -sf -X POST http://127.0.0.1:8000/tasks \
+                 -H 'Content-Type: application/json' \
+                 -d '{"title":"ci"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+          curl -sf "http://127.0.0.1:8000/tasks/$ID" || { docker logs app-test; exit 1; }
+
+          echo
+          echo "--- remove a tarefa ---"
+          curl -sf -o /dev/null -X DELETE "http://127.0.0.1:8000/tasks/$ID"
+
+          docker rm -f app-test
+
+      - name: Assumir role na AWS via OIDC
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login no ECR
+        id: ecr
+        if: github.event_name != 'pull_request'
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Push da imagem
+        id: push
+        if: github.event_name != 'pull_request'
+        env:
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
+        run: |
+          # O repositório é IMMUTABLE: publica-se apenas a tag do SHA, nunca
+          # "latest". Como a tag não pode ser sobrescrita, reexecutar o
+          # workflow no mesmo commit falharia no push — por isso o push só
+          # acontece se a tag ainda não existir. O deploy segue normalmente
+          # com a imagem que já está lá.
+          IMAGE="$REGISTRY/$ECR_REPOSITORY:${{ github.sha }}"
+
+          if aws ecr describe-images \
+               --repository-name "$ECR_REPOSITORY" \
+               --image-ids imageTag="${{ github.sha }}" >/dev/null 2>&1; then
+            echo "imagem ${{ github.sha }} ja publicada; pulando o push"
+          else
+            docker tag "app:${{ github.sha }}" "$IMAGE"
+            docker push "$IMAGE"
+          fi
+
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    needs: build-and-test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Assumir role na AWS via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Baixar a task definition atual
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "$ECS_TASK_FAMILY" \
+            --query taskDefinition > task-definition.json
+
+      - name: Trocar a imagem na task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ needs.build-and-test.outputs.image }}
+
+      - name: Registrar a revisao e atualizar o servico
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          # Falha o job se o serviço não estabilizar. Combinado com o circuit
+          # breaker do ECS, o deploy ruim volta sozinho e o pipeline fica
+          # vermelho — em vez de verde com produção quebrada.
+          wait-for-service-stability: true

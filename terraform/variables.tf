@@ -10,6 +10,12 @@ variable "aws_region" {
   default     = "us-east-1"
 }
 
+variable "github_repository" {
+  description = "Repositório no formato owner/nome, autorizado a assumir a role do pipeline"
+  type        = string
+  default     = "robson-devops/devops-02-ecs-microservice"
+}
+
 variable "image_tag" {
   description = <<-EOT
     Tag da imagem usada na task definition inicial. O pipeline registra novas
@@ -18,6 +24,16 @@ variable "image_tag" {
   EOT
   type        = string
   default     = "bootstrap"
+}
+
+variable "create_oidc_provider" {
+  description = <<-EOT
+    Cria o provider OIDC do GitHub. Ele é único por conta AWS: deixe falso se
+    já existir de outro projeto. Confira com
+    aws iam list-open-id-connect-providers antes do primeiro apply.
+  EOT
+  type        = bool
+  default     = false
 }
 
 variable "environment" {

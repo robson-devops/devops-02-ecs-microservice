@@ -3,6 +3,11 @@ output "ecr_repository_url" {
   value       = module.ecr.repository_url
 }
 
+output "pipeline_role_arn" {
+  description = "ARN da role assumida pelo GitHub Actions. Configure como secret AWS_ROLE_ARN no repositório"
+  value       = module.pipeline_identity.role_arn
+}
+
 output "ecs_cluster_name" {
   description = "Nome do cluster ECS, usado pelo pipeline"
   value       = module.ecs_service.cluster_name
