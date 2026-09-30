@@ -1,3 +1,5 @@
+![Arquitetura](docs/img/arquitetura.png)
+
 # devops-02-ecs-microservice
 
 API com PostgreSQL rodando em ECS Fargate atrás de um ALB, com deploy sem
